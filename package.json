@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "npm i & sequelize db:migrate:all & sequelize db:seed:all & node ./bin/www",
+    "start": "npm i sequelize-cli & sequelize db:migrate:all & sequelize db:seed:all & node ./bin/www",
     "devstart": "nodemon ./bin/www",
     "test": "jest"
   },
