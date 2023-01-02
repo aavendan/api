@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "db:reset": "npm install sequelize pg && npm install --save-dev sequelize-cli && npx sequelize-cli db:drop && npx sequelize-cli db:create && npx sequelize-cli db:migrate && npx sequelize-cli db:seed:all",
-    "start": "npm run db:reset && node ./bin/www",
+    "build": "npm run db:reset ",
+    "start": "node ./bin/www",
     "devstart": "nodemon ./bin/www",
     "test": "jest"
   },
