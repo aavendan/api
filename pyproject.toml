@@ -1,5 +1,6 @@
 [project]
 name = "main"
+version = "0.1.0"
 
 [tool.fastapi]
 entrypoint = "main:app"
