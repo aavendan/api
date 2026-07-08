@@ -1,8 +1,15 @@
-from fastapi import FastAPI, Form, Response, HTTPException, status
+from fastapi import FastAPI, Form, Depends, Response, HTTPException, status
 from typing import Annotated
 
 from models.item import Item
 from models.form_data import FormData
+from models.task import Task
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+load_dotenv()
+supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_PUBLISHABLE_KEY"))
 
 fake_items_db = [{"item_name": "Foo"}, {"item_name": "Bar"}, {"item_name": "Baz"}, {"item_name": "Qux"}, {"item_name": "Quux"}, {"item_name": "Corge"}, {"item_name": "Grault"}, {"item_name": "Garply"}, {"item_name": "Waldo"}, {"item_name": "Fred"}, {"item_name": "Plugh"}, {"item_name": "Xyzzy"}, {"item_name": "Thud"}]
 
@@ -73,3 +80,43 @@ def create_item(
   fake_items_db.append({"item_name": item_name})
 
   return Response(content=message, status_code=201)
+
+# Dependency to get the current user
+async def get_current_user():
+    user = supabase.auth.get_user()
+    print(user)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+# Create a task
+# @app.post("/tasks/")
+# def create_task(task: Task):
+#     data = supabase.table("tasks").insert({
+#         "title": task.title,
+#         "description": task.description
+#     }).execute()
+#     return data.data
+
+# Get all tasks
+# @app.get("/tasks/")
+# async def get_tasks():
+#    data = supabase.table("tasks").select("*").execute()
+#    return data.data
+
+@app.post("/tasks/")
+def create_task(task: Task):
+  data = supabase.table("task").insert({
+      "title": task.title,
+      "description": task.description
+  }).execute()
+  return data.data
+
+@app.get("/tasks/")
+def get_tasks():
+   data = supabase.table("task").select("*").execute()
+   return data.data
