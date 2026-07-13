@@ -1,15 +1,21 @@
-from fastapi import FastAPI, Form, Depends, Response, HTTPException, status
+from fastapi import FastAPI, Form, Depends, Response, HTTPException, status, Body, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
+import requests
 
 from models.item import Item
 from models.form_data import FormData
 from models.task import Task
+
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_PUBLISHABLE_KEY"))
+
+# Definimos el esquema de seguridad para capturar el token Bearer en el Header
+security = HTTPBearer()
 
 fake_items_db = [{"item_name": "Foo"}, {"item_name": "Bar"}, {"item_name": "Baz"}, {"item_name": "Qux"}, {"item_name": "Quux"}, {"item_name": "Corge"}, {"item_name": "Grault"}, {"item_name": "Garply"}, {"item_name": "Waldo"}, {"item_name": "Fred"}, {"item_name": "Plugh"}, {"item_name": "Xyzzy"}, {"item_name": "Thud"}]
 
@@ -81,42 +87,59 @@ def create_item(
 
   return Response(content=message, status_code=201)
 
-# Dependency to get the current user
-async def get_current_user():
-    user = supabase.auth.get_user()
-    print(user)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
-
 # Create a task
 # @app.post("/tasks/")
 # def create_task(task: Task):
-#     data = supabase.table("tasks").insert({
+#     data = supabase.table("task").insert({
 #         "title": task.title,
 #         "description": task.description
 #     }).execute()
 #     return data.data
 
-# Get all tasks
-# @app.get("/tasks/")
-# async def get_tasks():
-#    data = supabase.table("tasks").select("*").execute()
-#    return data.data
-
-@app.post("/tasks/")
-def create_task(task: Task):
-  data = supabase.table("task").insert({
-      "title": task.title,
-      "description": task.description
-  }).execute()
-  return data.data
-
+"""# Get all tasks
 @app.get("/tasks/")
-def get_tasks():
+async def get_tasks():
    data = supabase.table("task").select("*").execute()
-   return data.data
+   return data.data"""
+
+
+# Dependencia para obtener el cliente configurado con el JWT del usuario
+def get_supabase_client(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Client:
+    token = credentials.credentials
+    try:
+        client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_PUBLISHABLE_KEY"))
+        client.postgrest.auth(token)
+        return client
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Token de Supabase inválido o expirado"
+        )
+
+# --- CÓDIGO ESPECÍFICO PARA EL GET DE TASKS ---
+
+@app.get("/tasks/", status_code=status.HTTP_200_OK)
+def get_tasks(supabase: Client = Depends(get_supabase_client)):
+    try:
+        response = supabase.table("task").select("*").execute()
+        return response.data
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al recuperar las tareas desde la base de datos."
+        )
+
+@app.post("/auth/login-temporal")
+def login_temporal(email: str, password: str):
+    # Endpoint nativo de Supabase Auth
+    url = f"{os.getenv('SUPABASE_URL')}/auth/v1/token?grant_type=password"
+    headers = {"apikey": os.getenv("SUPABASE_PUBLISHABLE_KEY"), "Content-Type": "application/json"}
+    payload = {"email": email, "password": password}
+    
+    response = requests.post(url, json=payload, headers=headers)
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="Credenciales incorrectas en Supabase")
+        
+    # Retornamos el access_token que es el JWT que necesitas
+    return {"access_token": response.json().get("access_token")}
